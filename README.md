@@ -6,7 +6,7 @@
 
 OAuth proves who you are. API keys prove you have permission. SkyeSkiff proves what you hold: on-chain, across 34 blockchains, cryptographically signed, verifiable by anyone.
 
-Before two agents exchange data, both verify their wallets satisfy the same conditions. Token balances, NFT ownership, compliance attestations, whatever the use case requires. The blockchain state is the credential. Sell your tokens, and the next re-check removes you from the session. No secrets to share. No identity to verify first. No static credentials that expire or get leaked.
+Before two agents exchange data over their own channel, SkyeSkiff checks that both wallets satisfy the same conditions. Token balances, NFT ownership, compliance attestations, whatever the use case requires. The blockchain state is the credential. Sell your tokens, and the next re-check removes you from the session. No secrets to share. No identity to verify first. No static credentials that expire or get leaked.
 
 A signed challenge and a call per agent to a mutual session. No API key and no signup: every call is paid from the first one, by [x402 pay per call or credits](https://skyemeta.com/skyeskiff/).
 
