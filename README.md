@@ -49,12 +49,16 @@ Agent A                          SkyeSkiff                         Agent B
 1. **Declare**: Agent A signs its challenge, then sets conditions across any of 34 chains. Its wallet is attested immediately.
 2. **Join**: Agent B signs its own challenge, then joins. Both wallets are evaluated against the same conditions.
 3. **Session**: If both pass, each agent gets an ECDSA-signed JWT (`ES256`, `kid: "insumer-attest-v2"`; resolve the verification key from the JWKS by the token's `kid` rather than pinning it). Both can verify at any time.
-4. **Re-verify**: Any session member can have the session re-attested against current on-chain state, signing its own `reverify` challenge. Only an agent with a signed "not met" is ejected; if a re-attestation cannot be completed, nobody is ejected and the session is left as it was. Dynamic enforcement, not a one-time check.
+4. **Re-verify**: A session member (or only the creator, if the channel is set that way) can have the session re-attested against current on-chain state, signing its own `reverify` challenge. Only an agent with a signed "not met" is ejected; if a re-attestation cannot be completed, nobody is ejected and the session is left as it was. Checked again on demand, not once.
 
 ## Quick Start
 
-For a runnable end-to-end script (keypair generation + signing handled for you),
-see [`examples/`](examples/): `session.js`, `session.py`, or `session.sh`.
+For a script that generates keys and signs each step, see [`examples/`](examples/):
+`session.js`, `session.py` or `session.sh`. They do not pay: without credits on the
+creating wallet, the first call returns HTTP 402 with its price and the script stops
+there. For a full paid run against production, see
+[`examples/showcase.mjs`](examples/showcase.mjs) and its transcript in
+[`docs/showcase-transcript-2026-10-16.md`](docs/showcase-transcript-2026-10-16.md).
 
 ```bash
 # 1. Prove control of Agent A's wallet
@@ -135,7 +139,7 @@ Who may re-verify, and who pays, is the channel creator's choice, made once when
 | `creator` | only the creator (others get `403`) | the creator |
 | `requester` | any member | the member who asks |
 
-See [`examples/`](examples/) for complete scripts in bash, Python, and JavaScript.
+See [`examples/`](examples/) for scripts in bash, Python and JavaScript (they stop at HTTP 402 without credits) and `showcase.mjs` for a complete paid run.
 
 ## Use Cases
 
@@ -225,8 +229,8 @@ GET https://skyemeta.com/.well-known/agents.json
 
 | Tier | Rate | Spend |
 |------|------|-------|
-| Starter | 25 credits/$1 | $5–$99 |
-| Growth | 33 credits/$1 | $100–$499 |
+| Starter | 25 credits/$1 | $5 to $99 |
+| Growth | 33 credits/$1 | $100 to $499 |
 | Scale | 50 credits/$1 | $500+ |
 
 Each session = 2 credits (one per agent). The creator pays for both agents' entry; re-verification is paid per the channel's `reverifyPolicy`. **There are no free calls: every call is paid, from the first one.**
