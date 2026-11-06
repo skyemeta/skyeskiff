@@ -57,8 +57,10 @@ For a script that generates keys and signs each step, see [`examples/`](examples
 `session.js`, `session.py` or `session.sh`. They do not pay: without credits on the
 creating wallet, the first call returns HTTP 402 with its price and the script stops
 there. For a full paid run against production, see
-[`examples/showcase.mjs`](examples/showcase.mjs) and its transcript in
-[`docs/showcase-transcript-2026-10-16.md`](docs/showcase-transcript-2026-10-16.md).
+[`examples/showcase.mjs`](examples/showcase.mjs) and its transcripts
+([2026-11-06](docs/showcase-transcript-2026-11-06.md), [2026-10-16](docs/showcase-transcript-2026-10-16.md)).
+Real receipts from the latest run, with a verifier you can run offline, are in
+[`docs/receipts/`](docs/receipts/).
 
 ```bash
 # 1. Prove control of Agent A's wallet

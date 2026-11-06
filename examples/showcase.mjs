@@ -8,8 +8,10 @@
 //
 //   node showcase.mjs            run it (spends about $1.25 USDC from the smart wallet)
 //   node showcase.mjs --dry      print the plan and balances, call nothing
+// Every receipt the run gets is saved to docs/receipts/ beside a copy of InsumerAPI's JWKS,
+// so anyone can check them later, offline, with verify-receipt.mjs.
 // Env: CREATOR_OWNER_KEY, CREATOR_ACCOUNT (Coinbase Smart Wallet on Base, deployed, holding ~2 USDC), AGENT_B_KEY (holds ~1 USDC + a little ETH), AGENT_C_KEY (empty).
-// Deps: viem, @x402/core, @x402/evm, jose (npm i in examples/).
+// Deps: viem, @x402/core, @x402/evm, insumer-verify, @noble/post-quantum (npm i in examples/).
 import fs from 'fs';
 const NM = new URL('./node_modules/', import.meta.url).pathname;
 const { privateKeyToAccount } = await import(NM + 'viem/_esm/accounts/index.js');
@@ -18,7 +20,7 @@ const { base } = await import(NM + 'viem/_esm/chains/index.js');
 const { x402Client } = await import(NM + '@x402/core/dist/esm/client/index.mjs');
 const { encodePaymentSignatureHeader, decodePaymentRequiredHeader, decodePaymentResponseHeader } = await import(NM + '@x402/core/dist/esm/http/index.mjs');
 const { registerExactEvmScheme } = await import(NM + '@x402/evm/dist/esm/exact/client/index.mjs');
-const { jwtVerify, createRemoteJWKSet, decodeProtectedHeader } = await import(NM + 'jose/dist/node/esm/index.js');
+const { verifyAttestation } = await import(NM + 'insumer-verify/build/index.js');
 
 const DRY = process.argv.includes('--dry');
 const NET = 'eip155:8453';
@@ -88,10 +90,12 @@ async function paidCall(label, path, body) {
   say(`${label}: HTTP ${paid.status}${s ? `, settled: ${s.success}, tx ${scan(s.transaction)}` : ''}`);
   return paid;
 }
-const receipt = (who, att) => {
+// Every receipt is kept, so it can be saved and checked by anyone afterwards.
+const receipts = [];
+const receipt = (who, att, step) => {
   if (!att) return;
-  const hdr = decodeProtectedHeader(att.jwt);
-  say(`Receipt for ${who}: attestation ${att.attestation?.id || att.id || '(id in jwt)'}, pass=${att.attestation?.pass ?? att.pass}, signed by kid ${hdr.kid} (ES256)${att.pqKid ? ` and ${att.pqKid} (ML-DSA-65)` : ''}`);
+  receipts.push({ step, agent: who, receipt: att });
+  say(`Receipt for ${who}: attestation ${att.attestation?.id}, pass=${att.attestation?.pass}, signed by ${att.kid} (ES256)${att.pqKid ? ` and ${att.pqKid} (ML-DSA-65)` : ''}`);
 };
 
 // ---- the run ----------------------------------------------------------------
@@ -113,7 +117,8 @@ const jb = await paidCall('join B', '/join', { channelId, wallet: B.address, ...
 const bEntry = jb.body?.agents?.find(a => a.wallet.toLowerCase() === B.address.toLowerCase());
 if (jb.status !== 200) { code(jb.body); throw new Error('B should have been admitted'); }
 say(`B is in. Members now: ${jb.body.agents.map(a => short(a.wallet)).join(', ')}.`);
-receipt('B', bEntry?.attestation);
+receipt('creator', jb.body.agents.find(a => a.wallet.toLowerCase() === SW.toLowerCase())?.attestation, 'declare');
+receipt('B', bEntry?.attestation, 'join');
 
 h2('3. A regular wallet that does not qualify is refused');
 const jc = await paidCall('join C', '/join', { channelId, wallet: C.address, ...(await challenge(who.C, 'join')) });
@@ -135,7 +140,7 @@ const rv = await paidCall('re-verify', '/session', { action: 'reverify', session
 code({ valid: rv.body?.valid, ejected: rv.body?.ejected, remaining: rv.body?.agents?.map(a => a.wallet) });
 const ejectedB = (rv.body?.ejected || []).map(x => x.toLowerCase()).includes(B.address.toLowerCase());
 say(ejectedB ? `B is out. The creator stays. No admin pressed anything: the chain changed, the next check noticed.` : 'Unexpected: B was not ejected');
-for (const a of rv.body?.agents || []) receipt(short(a.wallet), a.attestation);
+for (const a of rv.body?.agents || []) receipt(a.wallet.toLowerCase() === SW.toLowerCase() ? 'creator' : short(a.wallet), a.attestation, 're-check');
 
 h2('6. B tries to get back in');
 const again = await paidCall('join B again', '/join', { channelId, wallet: B.address, ...(await challenge(who.B, 'join')) });
@@ -147,13 +152,25 @@ const after = await (await fetch(`${API}/session?id=${sessionId}`)).json();
 code({ valid: after.valid, members: after.agents?.map(a => a.wallet) });
 
 h2('8. Check the receipts without trusting anyone');
-const JWKS = createRemoteJWKSet(new URL('https://insumermodel.com/.well-known/jwks.json'));
-const jwts = [['B at join', bEntry?.attestation?.jwt], ...(rv.body?.agents || []).map(a => [`${short(a.wallet)} at re-check`, a.attestation?.jwt])].filter(x => x[1]);
-for (const [label, jwt] of jwts) {
-  try { const { payload, protectedHeader } = await jwtVerify(jwt, JWKS, { algorithms: ['ES256'] }); say(`${label}: ES256 signature VERIFIED against https://insumermodel.com/.well-known/jwks.json (kid ${protectedHeader.kid}); pass=${payload.pass ?? payload.attestation?.pass}`); }
-  catch (e) { say(`${label}: verification FAILED: ${e.message}`); }
+const jwks = await (await fetch('https://insumermodel.com/.well-known/jwks.json')).json();
+say(`Each receipt is checked with insumer-verify, InsumerAPI's own open-source verifier, against a saved copy of https://insumermodel.com/.well-known/jwks.json. Nothing is asked of SkyeSkiff.`);
+for (const r of receipts) {
+  const v = await verifyAttestation({ ok: true, data: r.receipt }, { jwks, mode: 'evidence' });
+  const c = v.checks;
+  say(`- ${r.agent} at ${r.step} (${r.receipt.attestation.id}, pass=${r.receipt.attestation.pass}): ES256 signature ${c.signature?.passed ? 'VERIFIED' : 'FAILED'}, condition hashes ${c.conditionHashes?.passed ? 'match' : 'DO NOT match'}, post-quantum signature ${c.pq?.status}${c.jwt ? `, JWT ${c.jwt.passed ? 'VERIFIED and bound to this receipt' : 'FAILED'}` : ''}`);
 }
+
+// Save the receipts and the key set they were checked against.
+const rdir = new URL('../docs/receipts/', dir);
+const day = new Date().toISOString().slice(0, 10);
+fs.mkdirSync(rdir, { recursive: true });
+fs.writeFileSync(new URL('jwks.json', rdir), JSON.stringify(jwks, null, 2) + '\n');
+receipts.forEach((r, n) => {
+  const name = `${day}-${n + 1}-${r.agent.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-${r.step.replace(/[^a-z]+/g, '-')}.json`;
+  fs.writeFileSync(new URL(name, rdir), JSON.stringify({ channelId, sessionId, step: r.step, agent: r.agent, receipt: r.receipt }, null, 2) + '\n');
+  say(`  saved docs/receipts/${name}`);
+});
 say(`\nBalances at the end: creator ${await usdc(SW)} USDC, B ${await usdc(B.address)} USDC, C ${await usdc(C.address)} USDC. Every call above was paid per call by the smart wallet over x402.`);
-const out = new URL('./showcase-transcript.md', dir);
+const out = new URL(`../docs/showcase-transcript-${new Date().toISOString().slice(0, 10)}.md`, dir);
 fs.writeFileSync(out, T.join('\n') + '\n');
 console.log('\ntranscript written to', out.pathname);
