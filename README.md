@@ -60,7 +60,10 @@ there. For a full paid run against production, see
 [`examples/showcase.mjs`](examples/showcase.mjs) and its transcripts
 ([2026-11-06](docs/showcase-transcript-2026-11-06.md), [2026-10-16](docs/showcase-transcript-2026-10-16.md)).
 Real receipts from the latest run, with a verifier you can run offline, are in
-[`docs/receipts/`](docs/receipts/).
+[`docs/receipts/`](docs/receipts/). For agents that must show who they act for, see
+[`examples/delegation.mjs`](examples/delegation.mjs): an ERC-7710 delegation is accepted, revoked
+on Base, and the next check removes the agent. Its receipts are in
+[`docs/receipts/delegation/`](docs/receipts/delegation/).
 
 ```bash
 # 1. Prove control of Agent A's wallet
@@ -250,6 +253,17 @@ JWKS. Every call is paid per call over x402 by the smart wallet (about $1.25). T
 the run of 2026-10-16, with every Base transaction, is in
 [`docs/showcase-transcript-2026-10-16.md`](docs/showcase-transcript-2026-10-16.md); the write-up is
 [Know Your Agent, on-chain](https://skyemeta.com/blog/know-your-agent-on-chain/).
+
+### Watched live: delegation and revocation
+
+`examples/delegation.mjs` does the same for who an agent acts for. A principal signs ERC-7710
+delegations (no gas) to the room's creator and a research agent; the room accepts only that
+principal's agents; the agent is admitted; the principal revokes its delegation on Base (one
+transaction); the next check ejects the agent with a signed "not met" (`failReason: "revoked"`),
+and its rejoin is refused. It pays from credits (5 per run), reads the balance before and after
+every call, and stops on any 402. Transcript:
+[`docs/delegation-transcript-2026-11-07.md`](docs/delegation-transcript-2026-11-07.md); receipts:
+[`docs/receipts/delegation/`](docs/receipts/delegation/).
 
 ## Or pay per call with x402
 

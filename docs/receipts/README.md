@@ -61,6 +61,11 @@ returns `503 upstream_unavailable`: nobody is removed, nobody is charged, and no
 To see exactly what a call cost, read the wallet's balance before and after it with
 `POST /api/skyeskiff/credits` (free, signed with a challenge for action `credits`).
 
+## Delegation and revocation
+
+Receipts from a run where an agent's ERC-7710 delegation is revoked on Base and the next check
+removes it are in [`delegation/`](delegation/), with their own README.
+
 ## Make your own
 
 [`../../examples/showcase.mjs`](../../examples/showcase.mjs) is the script that produced these. It runs against
