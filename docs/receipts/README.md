@@ -50,10 +50,16 @@ InsumerAPI never removes keys from that set, so a saved copy keeps old receipts 
 
 ## What a refusal returns
 
-A refused join (step 3 and step 6) returns `403 { "pass": false }` with no receipt, and an ejection
-at re-check lists the wallet in `ejected`. Both happen only on a signed "not met" from InsumerAPI.
-If a check gets no answer at all, SkyeSkiff returns `503 upstream_unavailable`: nobody is removed,
-nobody is charged, and nobody is cleared.
+Since 2026-11-07 every "not met" comes back signed as well. A refused declare or join returns
+`403 { "pass": false, "attestation": {...} }`, and a re-check returns `ejectedReceipts`, one
+`{ wallet, attestation }` per agent it removed. Both are InsumerAPI's signed result with
+`pass: false`, and `verify-receipt.mjs` checks them exactly like the receipts above. (The run on
+this page predates the change, so its refusals show only `{ "pass": false }`.)
+
+Only a signed "not met" refuses or removes anyone. If a check gets no answer at all, SkyeSkiff
+returns `503 upstream_unavailable`: nobody is removed, nobody is charged, and nobody is cleared.
+To see exactly what a call cost, read the wallet's balance before and after it with
+`POST /api/skyeskiff/credits` (free, signed with a challenge for action `credits`).
 
 ## Make your own
 
