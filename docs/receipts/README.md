@@ -50,11 +50,11 @@ InsumerAPI never removes keys from that set, so a saved copy keeps old receipts 
 
 ## What a refusal returns
 
-Since 2026-11-07 every "not met" comes back signed as well. A refused declare or join returns
+Every "not met" comes back signed too. A refused declare or join returns
 `403 { "pass": false, "attestation": {...} }`, and a re-check returns `ejectedReceipts`, one
 `{ wallet, attestation }` per agent it removed. Both are InsumerAPI's signed result with
-`pass: false`, and `verify-receipt.mjs` checks them exactly like the receipts above. (The run on
-this page predates the change, so its refusals show only `{ "pass": false }`.)
+`pass: false`, and `verify-receipt.mjs` checks them exactly like the receipts above. (The
+transcript for this run records only the status of each refusal.)
 
 Only a signed "not met" refuses or removes anyone. If a check gets no answer at all, SkyeSkiff
 returns `503 upstream_unavailable`: nobody is removed, nobody is charged, and nobody is cleared.
