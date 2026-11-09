@@ -70,7 +70,7 @@ on Base, and the next check removes the agent. Its receipts are in
 curl -X POST https://skyeskiff.skyemeta.com/api/skyeskiff/challenge \
   -H "Content-Type: application/json" \
   -d '{ "wallet": "0xAgentA...", "action": "declare" }'
-# Returns: { "message": "SkyeSkiff proof-of-control\n...", "nonce": "...", "expiresInSec": 120 }
+# Returns: { "message": "skyeskiff.skyemeta.com wants you to sign in with your Ethereum account:\n...", "nonce": "...", "expiresInSec": 120 }
 # Sign `message` with Agent A's wallet key (EIP-191) and send the signature AND the nonce back.
 # A plain key account is recovered locally; a smart-contract wallet (ERC-1271, or ERC-6492
 # before it is deployed) is checked on Base.
