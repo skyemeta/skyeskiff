@@ -71,7 +71,8 @@ curl -X POST https://skyeskiff.skyemeta.com/api/skyeskiff/challenge \
   -H "Content-Type: application/json" \
   -d '{ "wallet": "0xAgentA...", "action": "declare" }'
 # Returns: { "message": "skyeskiff.skyemeta.com wants you to sign in with your Ethereum account:\n...", "nonce": "...", "expiresInSec": 120 }
-# Sign `message` with Agent A's wallet key (EIP-191) and send the signature AND the nonce back.
+# Sign `message` exactly as returned with Agent A's wallet key (EIP-191) and send the signature AND
+# the nonce back. The full format is under "What You Sign" below.
 # A plain key account is recovered locally; a smart-contract wallet (ERC-1271, or ERC-6492
 # before it is deployed) is checked on Base.
 # Each challenge is its own one-time key, so nobody else's requests can cancel yours. e.g. with foundry:
@@ -145,6 +146,50 @@ Who may re-verify, and who pays, is the channel creator's choice, made once when
 | `requester` | any member | the member who asks |
 
 See [`examples/`](examples/) for scripts in bash, Python and JavaScript (they stop at HTTP 402 without credits) and `showcase.mjs` for a complete paid run.
+
+## What You Sign
+
+Every privileged action (declare, join, reverify, kick, leave, credits) starts with a one-time
+challenge, and the challenge is a Sign-In with Ethereum message (EIP-4361). Only the action in
+the statement line changes between actions:
+
+```
+skyeskiff.skyemeta.com wants you to sign in with your Ethereum account:
+<wallet, EIP-55 checksummed>
+
+SkyeSkiff proof-of-control. Action: <action>
+
+URI: https://skyeskiff.skyemeta.com
+Version: 1
+Chain ID: 8453
+Nonce: <64 lowercase hex characters>
+Issued At: <UTC, ISO 8601, whole seconds>
+Expiration Time: <Issued At + 120 seconds>
+```
+
+A real response, expired long ago and never signed:
+
+```json
+{
+  "message": "skyeskiff.skyemeta.com wants you to sign in with your Ethereum account:\n0xe7dB600bae17484489DbD0b3000b77BDc327a293\n\nSkyeSkiff proof-of-control. Action: declare\n\nURI: https://skyeskiff.skyemeta.com\nVersion: 1\nChain ID: 8453\nNonce: de86480dda136830af98496b973eada58512da3e03f26deb1d353643bf371a02\nIssued At: 2026-11-09T16:25:58.000Z\nExpiration Time: 2026-11-09T16:27:58.000Z",
+  "nonce": "de86480dda136830af98496b973eada58512da3e03f26deb1d353643bf371a02",
+  "expiresInSec": 120
+}
+```
+
+| Line | Binds |
+|---|---|
+| Domain, `URI` | The service. Wallets that read EIP-4361 (MetaMask among them) compare the domain with the page asking for the signature, so a page on another site shows the wallet's sign-in warning. |
+| Address | The signing wallet. The server rebuilds the message and checks the signature: a plain key account by local recovery, a smart-contract wallet on Base through ERC-1271 (ERC-6492 before it is deployed). |
+| Statement | The action. Each nonce is stored for the action it was issued for, so a signature for `join` is refused on any other action. |
+| `Chain ID` | Base (8453). |
+| `Nonce` | One use. Only a valid signature uses it up, so a bad signature from someone else cannot burn yours. |
+| `Issued At`, `Expiration Time` | The 120-second window, also enforced by the server. |
+
+- **Signing:** EIP-191 `personal_sign` over the message as a UTF-8 string, exactly as returned. Send the `signature` and the `nonce` with the action.
+- **Whitespace:** LF line endings only, never CRLF; lines 3 and 5 are blank; no trailing newline.
+- **Casing:** send `wallet` in any case. The message always carries it EIP-55 checksummed.
+- **Checking before you sign:** to confirm the text before a wallet signs it, parse it as EIP-4361 (for example viem's `parseSiweMessage`) and check the domain, address, statement and chain id against what you expect.
 
 ## Use Cases
 
